@@ -3,6 +3,7 @@ from rclpy.node import Node
 
 from sensor_msgs.msg import Image
 from cv_bridge import CvBridge
+from geometry_msgs.msg import Twist
 
 import cv2
 import numpy as np
@@ -19,6 +20,12 @@ class LineTracerNode(Node):
             Image,
             '/camera/image_raw',
             self.image_callback,
+            10
+        )
+
+        self.cmd_vel_publisher = self.create_publisher(
+            Twist,
+            '/cmd_vel',
             10
         )
 
@@ -69,6 +76,16 @@ class LineTracerNode(Node):
 
             # Error
             error = cx - image_center_x
+            KP = 0.005
+            angular_z = -KP * error
+            angular_z = max(-1.0, min(1.0, angular_z))
+
+            cmd = Twist()
+
+            cmd.linear.x = 0.05
+            cmd.angular.z = angular_z
+
+            self.cmd_vel_publisher.publish(cmd)
 
             cv2.line(
                 frame,
@@ -80,7 +97,7 @@ class LineTracerNode(Node):
 
             cv2.putText(
                 frame,
-                f'CX: {cx}  Error: {error}',
+                f'CX: {cx}  Error: {error}  Angular: {angular_z:.3f}',
                 (10, 30),
                 cv2.FONT_HERSHEY_SIMPLEX,
                 0.7,
@@ -89,6 +106,10 @@ class LineTracerNode(Node):
             )
 
         else:
+            cmd = Twist()
+            cmd.linear.x = 0.0
+            cmd.angular.z = 0.0
+            self.cmd_vel_publisher.publish(cmd)
             cv2.putText(
                 frame,
                 'RED LINE NOT FOUND',
